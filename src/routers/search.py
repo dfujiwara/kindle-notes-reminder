@@ -63,7 +63,7 @@ def _group_and_fetch_notes(
     if not similar_notes:
         return []
 
-    book_ids = [n.book_id for n in similar_notes]
+    book_ids = list({n.book_id for n in similar_notes})
     fetched_books = book_repository.get_by_ids(book_ids)
     fetched_books_dict = {b.id: b for b in fetched_books}
 
@@ -104,7 +104,7 @@ def _group_and_fetch_chunks(
     if not similar_chunks:
         return []
 
-    url_ids = [c.url_id for c in similar_chunks]
+    url_ids = list({c.url_id for c in similar_chunks})
     fetched_urls = url_repository.get_by_ids(url_ids)
     fetched_urls_dict = {u.id: u for u in fetched_urls}
 
