@@ -6,7 +6,6 @@ unified response schema, SSE streaming, and background evaluation.
 """
 
 import json
-from datetime import datetime, timezone
 from typing import Any
 
 import pytest
@@ -17,12 +16,11 @@ from src.main import app
 from src.repositories.models import (
     BookCreate,
     NoteCreate,
-    TweetCreate,
-    TweetThreadCreate,
     URLChunkCreate,
     URLCreate,
 )
 from src.routers.conftest import RandomV2DepsSetup
+from src.test_utils import make_thread_and_tweets
 
 client = TestClient(app)
 
@@ -159,26 +157,14 @@ async def test_random_v2_tweet_response_structure(
     """Test GET /random/v2 returns correct unified schema for tweet."""
     _, _, _, _, _, thread_repo, tweet_repo = setup_random_v2_deps()
 
-    thread = thread_repo.add(
-        TweetThreadCreate(
-            root_tweet_id="root123",
-            author_username="testuser",
-            author_display_name="Test User",
-            title="Test thread title",
-        )
+    thread, tweets = make_thread_and_tweets(
+        thread_repo,
+        tweet_repo,
+        tweet_contents=["This is a test tweet about programming"],
+        root_tweet_id="root123",
+        embedding=[0.1] * 1536,
     )
-    tweet = tweet_repo.add(
-        TweetCreate(
-            tweet_id="tweet123",
-            author_username="testuser",
-            author_display_name="Test User",
-            content="This is a test tweet about programming",
-            thread_id=thread.id,
-            position_in_thread=0,
-            tweeted_at=datetime.now(timezone.utc),
-            embedding=[0.1] * 1536,
-        )
-    )
+    tweet = tweets[0]
 
     # Make async SSE streaming request
     transport = ASGITransport(app=app)

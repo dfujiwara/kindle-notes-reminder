@@ -4,7 +4,7 @@
 
 Add capability to ingest tweets (and tweet threads) into the system, making them searchable alongside Kindle notes and URL content. Tweets will be stored with embeddings for semantic search and served through the existing API infrastructure.
 
-**Status: In Progress - Phase 6 Complete**
+**Status: In Progress - Phase 7 Complete**
 
 ## Current Architecture Understanding
 
@@ -313,10 +313,10 @@ Twitter API v2 access has become increasingly restricted. This phase validates A
 ### Phase 7: Search Integration
 
 **7.1 Update `src/routers/search.py`:**
-- [ ] Search tweets alongside notes and URL chunks
-- [ ] Allocate portion of limit to tweets (1/3 or configurable)
-- [ ] Group tweets by thread in results
-- [ ] Update `SearchResult` model to include `tweet_threads` array
+- [x] Search tweets alongside notes and URL chunks
+- [x] Allocate portion of limit to tweets (same as notes/chunks)
+- [x] Group tweets by thread in results
+- [x] Update `SearchResult` model to include `tweet_threads` array
 
 ### Phase 8: Testing
 
@@ -335,7 +335,7 @@ Twitter API v2 access has become increasingly restricted. This phase validates A
 **8.3 Router Tests:**
 - [x] `src/routers/test_tweets.py` - All tweet endpoints
 - [x] Update `src/routers/test_random_content.py` - Include tweets
-- [ ] Update `src/routers/test_search.py` - Include tweets
+- [x] Update `src/routers/test_search.py` - Include tweets
 
 **8.4 Add Test Fixtures:**
 - [x] Update `src/routers/conftest.py` with `setup_tweet_deps()`
@@ -563,3 +563,10 @@ Twitter API v2 access has become increasingly restricted. This phase validates A
 *Created: 2026-01-24*
 
 *Last Updated: 2026-03-14*
+
+**Phase 7 Completed (2026-03-14):**
+- Added `tweet_threads: list[TweetThreadWithTweetsResponse]` field to `SearchResult` model
+- Updated `/search` endpoint to call `tweet_repository.search_tweets_by_embedding()`
+- Added `_group_and_fetch_tweets()` helper to group matched tweets by their thread
+- Updated `setup_search_deps` fixture in `conftest.py` to include tweet thread/tweet repos
+- Added 5 new tweet-specific tests to `test_search.py` (all 287 tests passing)

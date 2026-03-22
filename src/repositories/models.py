@@ -250,6 +250,7 @@ class SearchResult(SQLModel):
     ]  # Deprecated: use 'books' field instead (kept for backwards compatibility)
     books: list[BookWithNoteResponses]
     urls: list[URLWithChunksResponses]
+    tweet_threads: list["TweetThreadWithTweetsResponse"] = Field(default_factory=list)
     count: int
 
 

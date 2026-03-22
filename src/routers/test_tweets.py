@@ -12,6 +12,7 @@ from typing import Any
 from datetime import datetime, timezone
 
 from src.routers.conftest import TweetDepsSetup
+from src.test_utils import make_thread_and_tweets
 from ..main import app
 from ..repositories.models import TweetThreadCreate, TweetCreate
 
@@ -279,27 +280,14 @@ async def test_get_tweet_with_context_stream_success(setup_tweet_deps: TweetDeps
     thread_repo, tweet_repo, _ = setup_tweet_deps()
 
     # Create test thread and tweet
-    thread = thread_repo.add(
-        TweetThreadCreate(
-            root_tweet_id="tweet001",
-            author_username="user1",
-            author_display_name="User One",
-            title="Test thread",
-        )
+    thread, tweets = make_thread_and_tweets(
+        thread_repo,
+        tweet_repo,
+        tweet_contents=["Test tweet content"],
+        root_tweet_id="tweet001",
+        embedding=[0.1] * 1536,
     )
-    now = datetime.now(timezone.utc)
-    tweet = tweet_repo.add(
-        TweetCreate(
-            tweet_id="t1",
-            author_username="user1",
-            author_display_name="User One",
-            content="Test tweet content",
-            thread_id=thread.id,
-            position_in_thread=0,
-            tweeted_at=now,
-            embedding=[0.1] * 1536,
-        )
-    )
+    tweet = tweets[0]
 
     # Make SSE streaming request
     transport = ASGITransport(app=app)

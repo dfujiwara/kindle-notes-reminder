@@ -533,3 +533,41 @@ class StubTweetRepository(TweetRepositoryInterface):
 
     def count_with_embeddings(self) -> int:
         return len([t for t in self.tweets if t.embedding is not None])
+
+
+def make_thread_and_tweets(
+    thread_repo: StubTweetThreadRepository,
+    tweet_repo: StubTweetRepository,
+    tweet_contents: list[str],
+    root_tweet_id: str = "thread1",
+    embedding: list[float] | None = None,
+) -> tuple[TweetThreadResponse, list[TweetRead]]:
+    """Create a thread and its tweets in stub repos. Returns (thread, tweets)."""
+    if embedding is None:
+        embedding = [0.5] * 1536
+
+    thread = thread_repo.add(
+        TweetThreadCreate(
+            root_tweet_id=root_tweet_id,
+            author_username="testuser",
+            author_display_name="Test User",
+            title=tweet_contents[0][:50],
+        )
+    )
+    tweets: list[TweetRead] = []
+    for i, content in enumerate(tweet_contents):
+        tweet = tweet_repo.add(
+            TweetCreate(
+                tweet_id=f"{root_tweet_id}_{i}",
+                author_username="testuser",
+                author_display_name="Test User",
+                content=content,
+                media_urls=[],
+                thread_id=thread.id,
+                position_in_thread=i,
+                embedding=embedding,
+                tweeted_at=datetime.now(timezone.utc),
+            )
+        )
+        tweets.append(tweet)
+    return thread, tweets
