@@ -551,22 +551,22 @@ Twitter API v2 access has become increasingly restricted. This phase validates A
 
 ---
 
-**Next Steps:**
-1. Complete Phase 7: Search integration (search.py has no tweet support yet)
-2. Complete Phase 8 remaining: Update `src/routers/test_search.py` with tweet tests
-3. Complete Phase 9: Documentation updates
-
----
-
-*Plan Status: **IN PROGRESS - PHASE 6 COMPLETE***
-
-*Created: 2026-01-24*
-
-*Last Updated: 2026-03-14*
-
 **Phase 7 Completed (2026-03-14):**
 - Added `tweet_threads: list[TweetThreadWithTweetsResponse]` field to `SearchResult` model
 - Updated `/search` endpoint to call `tweet_repository.search_tweets_by_embedding()`
 - Added `_group_and_fetch_tweets()` helper to group matched tweets by their thread
 - Updated `setup_search_deps` fixture in `conftest.py` to include tweet thread/tweet repos
 - Added 5 new tweet-specific tests to `test_search.py` (all 287 tests passing)
+- Fixed: deduplicate IDs before `get_by_ids` in `_group_and_fetch_notes` and `_group_and_fetch_chunks`, consistent with `_group_and_fetch_tweets`
+
+**Next Steps:**
+1. Complete Phase 8 remaining: unit/repository tests (`test_twitter_fetcher.py`, `test_tweet_processor.py`, repository tests)
+2. Complete Phase 9: Documentation updates (CLAUDE.md)
+
+---
+
+*Plan Status: **IN PROGRESS - PHASE 7 COMPLETE***
+
+*Created: 2026-01-24*
+
+*Last Updated: 2026-03-21*
