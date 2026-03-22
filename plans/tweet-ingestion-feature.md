@@ -4,7 +4,7 @@
 
 Add capability to ingest tweets (and tweet threads) into the system, making them searchable alongside Kindle notes and URL content. Tweets will be stored with embeddings for semantic search and served through the existing API infrastructure.
 
-**Status: In Progress - Phase 7 Complete**
+**Status: In Progress - Phase 8 Complete**
 
 ## Current Architecture Understanding
 
@@ -323,14 +323,12 @@ Twitter API v2 access has become increasingly restricted. This phase validates A
 **Testing Strategy Note:** Twitter API mocking requires careful setup. Use `respx` library (async-compatible) for mocking `httpx` requests to Twitter API. Create fixture files with sample API responses for consistent test data.
 
 **8.1 Unit Tests:**
-- [ ] `src/tweet_ingestion/test_twitter_fetcher.py` - Fetching, parsing, error handling
-  - Use `respx` to mock Twitter API responses
-  - Include fixtures for: single tweet, thread, deleted tweet, rate limit response
-- [ ] `src/tweet_ingestion/test_tweet_processor.py` - Processing pipeline
+- [x] `src/tweet_ingestion/test_twitter_fetcher.py` - Fetching, parsing, error handling (24 tests)
+- [x] `src/tweet_ingestion/test_tweet_processor.py` - Processing pipeline (12 tests)
 
 **8.2 Repository Tests:**
-- [ ] `src/tweet_ingestion/repositories/test_tweet_thread_repository.py`
-- [ ] `src/tweet_ingestion/repositories/test_tweet_repository.py`
+- [x] `src/tweet_ingestion/repositories/test_tweet_thread_repository.py` (16 tests)
+- [x] `src/tweet_ingestion/repositories/test_tweet_repository.py` (20 tests)
 
 **8.3 Router Tests:**
 - [x] `src/routers/test_tweets.py` - All tweet endpoints
@@ -552,17 +550,15 @@ Twitter API v2 access has become increasingly restricted. This phase validates A
 ---
 
 **Next Steps:**
-1. Complete Phase 7: Search integration (search.py has no tweet support yet)
-2. Complete Phase 8 remaining: Update `src/routers/test_search.py` with tweet tests
-3. Complete Phase 9: Documentation updates
+1. Complete Phase 9: Documentation updates (CLAUDE.md)
 
 ---
 
-*Plan Status: **IN PROGRESS - PHASE 6 COMPLETE***
+*Plan Status: **IN PROGRESS - PHASE 8 COMPLETE***
 
 *Created: 2026-01-24*
 
-*Last Updated: 2026-03-14*
+*Last Updated: 2026-03-21*
 
 **Phase 7 Completed (2026-03-14):**
 - Added `tweet_threads: list[TweetThreadWithTweetsResponse]` field to `SearchResult` model
@@ -570,3 +566,9 @@ Twitter API v2 access has become increasingly restricted. This phase validates A
 - Added `_group_and_fetch_tweets()` helper to group matched tweets by their thread
 - Updated `setup_search_deps` fixture in `conftest.py` to include tweet thread/tweet repos
 - Added 5 new tweet-specific tests to `test_search.py` (all 287 tests passing)
+- Fixed: deduplicate IDs before `get_by_ids` in `_group_and_fetch_notes` and `_group_and_fetch_chunks`, consistent with `_group_and_fetch_tweets`
+
+**Phase 8 Completed (2026-03-21):**
+- Added `test_twitter_fetcher.py` with 24 tests covering fetching, URL parsing, thread traversal, rate limiting, error handling
+- Added `test_tweet_processor.py` with 12 tests covering full processing pipeline and deduplication
+- Repository tests were already in place from Phase 2: 16 tests for TweetThreadRepository, 20 for TweetRepository (73 total tweet_ingestion tests passing)
