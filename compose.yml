@@ -11,6 +11,7 @@ services:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/fastapi_db
       - PYTHONPATH=/app
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - TWITTER_BEARER_TOKEN=${TWITTER_BEARER_TOKEN}
     depends_on:
       - db
     networks:
