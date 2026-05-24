@@ -161,6 +161,13 @@ class TweetRepository(TweetRepositoryInterface):
         results = self.session.exec(statement)
         return {thread_id: count for thread_id, count in results}
 
+    def delete_by_thread_id(self, thread_id: int) -> None:
+        statement = select(Tweet).where(Tweet.thread_id == thread_id)
+        tweets = self.session.exec(statement).all()
+        for tweet in tweets:
+            self.session.delete(tweet)
+        self.session.flush()
+
     def count_with_embeddings(self) -> int:
         """
         Count tweets that have embeddings.

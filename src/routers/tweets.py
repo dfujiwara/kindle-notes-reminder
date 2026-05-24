@@ -139,6 +139,32 @@ async def get_tweets(
     return TweetThreadsListResponse(threads=threads)
 
 
+@router.delete(
+    "/tweets/{thread_id}",
+    summary="Delete tweet thread and all its tweets",
+    description="Delete a tweet thread and all associated tweets from the database.",
+    status_code=204,
+    responses={
+        404: {"description": "Tweet thread not found"},
+        204: {"description": "Tweet thread deleted successfully"},
+    },
+)
+async def delete_tweet_thread(
+    thread_id: int,
+    thread_repository: TweetThreadRepositoryInterface = Depends(
+        get_tweet_thread_repository
+    ),
+    tweet_repository: TweetRepositoryInterface = Depends(get_tweet_repository),
+) -> None:
+    """Delete a tweet thread and all its tweets."""
+    thread = thread_repository.get(thread_id)
+    if not thread:
+        raise HTTPException(status_code=404, detail="Tweet thread not found")
+
+    tweet_repository.delete_by_thread_id(thread_id)
+    thread_repository.delete(thread_id)
+
+
 @router.get(
     "/tweets/{thread_id}",
     summary="Get tweet thread with all tweets",

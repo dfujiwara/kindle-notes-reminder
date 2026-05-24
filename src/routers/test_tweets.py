@@ -143,6 +143,64 @@ def test_get_tweets_with_threads(setup_tweet_deps: TweetDepsSetup):
     assert t2_response["author_username"] == "user2"
 
 
+def test_delete_tweet_thread_not_found(setup_tweet_deps: TweetDepsSetup):
+    """Test DELETE /tweets/{thread_id} returns 404 when thread doesn't exist."""
+    setup_tweet_deps()
+
+    response = client.delete("/tweets/999")
+
+    assert response.status_code == 404
+    data = response.json()
+    assert data["detail"] == "Tweet thread not found"
+
+
+def test_delete_tweet_thread_success(setup_tweet_deps: TweetDepsSetup):
+    """Test DELETE /tweets/{thread_id} deletes thread and all its tweets."""
+    thread_repo, tweet_repo, _, _ = setup_tweet_deps()
+
+    thread = thread_repo.add(
+        TweetThreadCreate(
+            root_tweet_id="tweet001",
+            author_username="user1",
+            author_display_name="User One",
+            title="My thread",
+        )
+    )
+    now = datetime.now(timezone.utc)
+    tweet_repo.add(
+        TweetCreate(
+            tweet_id="t1",
+            author_username="user1",
+            author_display_name="User One",
+            content="First tweet",
+            media_urls=[],
+            thread_id=thread.id,
+            position_in_thread=0,
+            tweeted_at=now,
+            embedding=[0.1] * 1536,
+        )
+    )
+    tweet_repo.add(
+        TweetCreate(
+            tweet_id="t2",
+            author_username="user1",
+            author_display_name="User One",
+            content="Second tweet",
+            media_urls=[],
+            thread_id=thread.id,
+            position_in_thread=1,
+            tweeted_at=now,
+            embedding=[0.2] * 1536,
+        )
+    )
+
+    response = client.delete(f"/tweets/{thread.id}")
+
+    assert response.status_code == 204
+    assert thread_repo.get(thread.id) is None
+    assert tweet_repo.get_by_thread_id(thread.id) == []
+
+
 def test_get_tweet_thread_not_found(setup_tweet_deps: TweetDepsSetup):
     """Test GET /tweets/{thread_id} returns 404 when thread doesn't exist."""
     setup_tweet_deps()
