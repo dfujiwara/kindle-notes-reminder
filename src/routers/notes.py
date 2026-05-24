@@ -104,7 +104,11 @@ async def get_note_with_context_stream(
         yield format_sse("metadata", metadata.model_dump(mode="json"))
 
         # Prepare prompt and instruction
-        prompt = create_context_prompt(book.title, note.content)
+        prompt = create_context_prompt(
+            book.title,
+            note.content,
+            [similar_note.content for similar_note in similar_notes],
+        )
         instruction = SYSTEM_INSTRUCTIONS["context_provider"]
 
         # Stream context chunks and collect result

@@ -55,6 +55,19 @@ def test_basic_context_prompt():
     assert note_content in prompt
 
 
+def test_context_prompt_includes_related_notes():
+    """Test context prompt includes similar notes when provided."""
+    prompt = create_context_prompt(
+        "Python Programming",
+        "Variables store data",
+        ["Loops repeat work", "Functions organize code"],
+    )
+
+    assert "Related notes:" in prompt
+    assert "Loops repeat work" in prompt
+    assert "Functions organize code" in prompt
+
+
 def test_basic_chunk_context_prompt():
     """Test basic chunk context prompt generation."""
     url = "https://example.com/python-guide"

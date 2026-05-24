@@ -350,10 +350,12 @@ class StubLLMClient(LLMClientInterface):
         self.responses = responses
         self.should_fail = should_fail
         self.call_count = 0
+        self.prompts: list[str] = []
 
     async def get_response(
         self, prompt: str, instruction: str, json_mode: bool = False
     ) -> str:
+        self.prompts.append(prompt)
         response = self.responses[self.call_count]
         self.call_count += 1
         if self.should_fail:

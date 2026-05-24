@@ -25,7 +25,7 @@ async def test_get_note_with_context_stream_success(
     setup_streaming_deps: StreamingDepsSetup,
 ):
     """Test streaming specific note endpoint returns proper SSE events"""
-    book_repo, note_repo, _, _ = setup_streaming_deps(
+    book_repo, note_repo, _, llm_client = setup_streaming_deps(
         llm_responses=["Specific note context", evaluation_response]
     )
 
@@ -86,6 +86,10 @@ async def test_get_note_with_context_stream_success(
             assert len(content_events) > 0
             full_content = "".join([e["data"]["content"] for e in content_events])
             assert "Specific note context" in full_content
+
+            # Verify similar notes were included in the LLM prompt
+            assert llm_client.prompts
+            assert "Related note content" in llm_client.prompts[0]
 
 
 @pytest.mark.asyncio

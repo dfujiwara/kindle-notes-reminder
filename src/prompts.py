@@ -61,23 +61,41 @@ Score: [0.0-1.0]
 Evaluation: [Your detailed evaluation]"""
 
 
-def create_context_prompt(book_title: str, note_content: str) -> str:
+def create_context_prompt(
+    book_title: str,
+    note_content: str,
+    related_notes: list[str] | None = None,
+) -> str:
     """
     Create a prompt for generating additional context for a note.
 
     Args:
         book_title: The title of the book the note is from
         note_content: The content of the note
+        related_notes: Optional similar notes to use as supporting context
 
     Returns:
         A formatted context generation prompt string
     """
-    return f"""Book: "{book_title}"
+    prompt = f"""Book: "{book_title}"
 
 Highlighted passage:
 "{note_content}"
+"""
+
+    if related_notes:
+        related_notes_text = "\n".join(f"- {note}" for note in related_notes)
+        prompt += f"""
+
+Related notes:
+{related_notes_text}
+
+Use the related notes to enrich the explanation without repeating them verbatim."""
+
+    prompt += """
 
 Explain this concept clearly and provide a practical example that makes it memorable."""
+    return prompt
 
 
 def create_summary_prompt(content: str) -> str:
