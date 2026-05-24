@@ -384,6 +384,17 @@ def test_get_tweet_counts_by_thread_ids_nonexistent_threads(
     assert counts == {}
 
 
+def test_delete_by_thread_id(
+    tweet_repo: TweetRepository, sample_tweets: list[TweetRead], sample_thread_id: int
+):
+    """Test deleting all tweets for a thread."""
+    assert tweet_repo.get_by_thread_id(sample_thread_id) != []
+
+    tweet_repo.delete_by_thread_id(sample_thread_id)
+
+    assert tweet_repo.get_by_thread_id(sample_thread_id) == []
+
+
 def test_count_with_embeddings(
     tweet_repo: TweetRepository,
     sample_tweets: list[TweetRead],

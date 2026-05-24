@@ -533,6 +533,9 @@ class StubTweetRepository(TweetRepositoryInterface):
                 result[tweet.thread_id] = result.get(tweet.thread_id, 0) + 1
         return result
 
+    def delete_by_thread_id(self, thread_id: int) -> None:
+        self.tweets = [t for t in self.tweets if t.thread_id != thread_id]
+
     def count_with_embeddings(self) -> int:
         return len([t for t in self.tweets if t.embedding is not None])
 
