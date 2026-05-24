@@ -19,7 +19,7 @@ client = TestClient(app)
 
 def test_ingest_url_fetch_error(setup_url_deps: URLDepsSetup):
     """Test URL fetch error returns 422 (unprocessable entity)."""
-    _, _, fetcher = setup_url_deps(fetcher_should_fail=True)
+    _, _, fetcher, _ = setup_url_deps(fetcher_should_fail=True)
 
     response = client.post("/urls", json={"url": "https://invalid.com"})
 
@@ -34,7 +34,7 @@ def test_ingest_url_fetch_error(setup_url_deps: URLDepsSetup):
 
 def test_ingest_url_success(setup_url_deps: URLDepsSetup):
     """Test successful URL ingestion returns 200 with chunks stored."""
-    url_repo, chunk_repo, _ = setup_url_deps()
+    url_repo, chunk_repo, _, _ = setup_url_deps()
 
     response = client.post("/urls", json={"url": "https://example.com"})
 
@@ -78,7 +78,7 @@ def test_get_urls_empty(setup_url_deps: URLDepsSetup):
 
 def test_get_urls_with_urls(setup_url_deps: URLDepsSetup):
     """Test GET /urls returns all URLs with chunk counts."""
-    url_repo, chunk_repo, _ = setup_url_deps()
+    url_repo, chunk_repo, _, _ = setup_url_deps()
 
     # Create test data
     url1 = url_repo.add(URLCreate(url="https://example1.com", title="Example 1"))
@@ -174,7 +174,7 @@ def test_get_url_with_chunks_not_found(setup_url_deps: URLDepsSetup):
 
 def test_get_url_with_chunks_empty(setup_url_deps: URLDepsSetup):
     """Test GET /urls/{url_id} returns URL with empty chunks when no chunks exist."""
-    url_repo, _, _ = setup_url_deps()
+    url_repo, _, _, _ = setup_url_deps()
 
     # Create URL without chunks
     url = url_repo.add(URLCreate(url="https://example.com", title="Example"))
@@ -191,7 +191,7 @@ def test_get_url_with_chunks_empty(setup_url_deps: URLDepsSetup):
 
 def test_get_url_with_chunks_success(setup_url_deps: URLDepsSetup):
     """Test GET /urls/{url_id} returns URL with all chunks ordered by chunk_order."""
-    url_repo, chunk_repo, _ = setup_url_deps()
+    url_repo, chunk_repo, _, _ = setup_url_deps()
 
     # Create URL
     url = url_repo.add(URLCreate(url="https://example.com", title="Example"))
@@ -266,7 +266,7 @@ def test_delete_url_not_found(setup_url_deps: URLDepsSetup):
 
 def test_delete_url_success(setup_url_deps: URLDepsSetup):
     """Test DELETE /urls/{url_id} deletes URL and all its chunks."""
-    url_repo, chunk_repo, _ = setup_url_deps()
+    url_repo, chunk_repo, _, _ = setup_url_deps()
 
     # Create URL with chunks
     url = url_repo.add(URLCreate(url="https://example.com", title="Example"))
@@ -316,9 +316,9 @@ def test_get_chunk_with_context_stream_not_found(setup_url_deps: URLDepsSetup):
 @pytest.mark.asyncio
 async def test_get_chunk_with_context_stream_success(setup_url_deps: URLDepsSetup):
     """Test GET /urls/{url_id}/chunks/{chunk_id} streams events correctly."""
-    url_repo, chunk_repo, _ = setup_url_deps()
+    url_repo, chunk_repo, _, llm_client = setup_url_deps()
 
-    # Create test URL and chunk
+    # Create test URL and chunks
     url = url_repo.add(URLCreate(url="https://example.com", title="Example"))
     chunk = chunk_repo.add(
         URLChunkCreate(
@@ -328,6 +328,16 @@ async def test_get_chunk_with_context_stream_success(setup_url_deps: URLDepsSetu
             chunk_order=1,
             is_summary=False,
             embedding=[0.1] * 1536,
+        )
+    )
+    chunk_repo.add(
+        URLChunkCreate(
+            content="Related chunk content",
+            content_hash="hash2",
+            url_id=url.id,
+            chunk_order=2,
+            is_summary=False,
+            embedding=[0.2] * 1536,
         )
     )
 
@@ -373,3 +383,7 @@ async def test_get_chunk_with_context_stream_success(setup_url_deps: URLDepsSetu
             # Reconstruct the full content from chunks
             full_content = "".join([e["data"]["content"] for e in content_events])
             assert full_content == "Test LLM response"
+
+            # Verify related chunk content was included in the LLM prompt
+            assert llm_client.prompts
+            assert "Related chunk content" in llm_client.prompts[0]

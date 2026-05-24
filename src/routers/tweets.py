@@ -224,7 +224,11 @@ async def get_tweet_with_context_stream(
         yield format_sse("metadata", metadata.model_dump(mode="json"))
 
         # Prepare prompt and instruction
-        prompt = create_tweet_context_prompt(tweet.author_username, tweet.content)
+        prompt = create_tweet_context_prompt(
+            tweet.author_username,
+            tweet.content,
+            [similar_tweet.content for similar_tweet in similar_tweets],
+        )
         instruction = SYSTEM_INSTRUCTIONS["context_provider"]
 
         # Stream context chunks

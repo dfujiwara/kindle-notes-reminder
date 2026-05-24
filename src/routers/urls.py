@@ -241,7 +241,12 @@ async def get_chunk_with_context_stream(
         yield format_sse("metadata", metadata.model_dump(mode="json"))
 
         # Prepare prompt and instruction
-        prompt = create_chunk_context_prompt(url.url, url.title, chunk.content)
+        prompt = create_chunk_context_prompt(
+            url.url,
+            url.title,
+            chunk.content,
+            [similar_chunk.content for similar_chunk in similar_chunks],
+        )
         instruction = SYSTEM_INSTRUCTIONS["context_provider"]
 
         # Stream context chunks

@@ -115,7 +115,12 @@ def create_summary_prompt(content: str) -> str:
 Summary:"""
 
 
-def create_chunk_context_prompt(url: str, url_title: str, chunk_content: str) -> str:
+def create_chunk_context_prompt(
+    url: str,
+    url_title: str,
+    chunk_content: str,
+    related_chunks: list[str] | None = None,
+) -> str:
     """
     Create a prompt for generating additional context for a URL chunk.
 
@@ -123,34 +128,66 @@ def create_chunk_context_prompt(url: str, url_title: str, chunk_content: str) ->
         url: The URL of the webpage
         url_title: The title of the URL/webpage
         chunk_content: The content of the chunk
+        related_chunks: Optional similar chunks to use as supporting context
 
     Returns:
         A formatted context generation prompt string
     """
-    return f"""Article: "{url_title}"
+    prompt = f"""Article: "{url_title}"
 URL: {url}
 
 Content passage:
 "{chunk_content}"
+"""
+
+    if related_chunks:
+        related_chunks_text = "\n".join(f"- {chunk}" for chunk in related_chunks)
+        prompt += f"""
+
+Related chunks:
+{related_chunks_text}
+
+Use the related chunks to enrich the explanation without repeating them verbatim."""
+
+    prompt += """
 
 Explain this concept clearly and provide a practical example that makes it memorable."""
+    return prompt
 
 
-def create_tweet_context_prompt(author_username: str, tweet_content: str) -> str:
+def create_tweet_context_prompt(
+    author_username: str,
+    tweet_content: str,
+    related_tweets: list[str] | None = None,
+) -> str:
     """
     Create a prompt for generating additional context for a tweet.
 
     Args:
         author_username: The Twitter username of the tweet author
         tweet_content: The content of the tweet
+        related_tweets: Optional similar tweets to use as supporting context
 
     Returns:
         A formatted context generation prompt string
     """
-    return f"""Tweet by @{author_username}:
+    prompt = f"""Tweet by @{author_username}:
 "{tweet_content}"
+"""
+
+    if related_tweets:
+        related_tweets_text = "\n".join(f"- {tweet}" for tweet in related_tweets)
+        prompt += f"""
+
+Related tweets:
+{related_tweets_text}
+
+Use the related tweets to enrich the explanation without repeating them verbatim."""
+
+    prompt += """
 
 Explain the key idea in this tweet clearly and provide a practical example or context that makes it memorable."""
+    return prompt
 
 
 def create_semantic_chunking_prompt(content: str) -> str:
