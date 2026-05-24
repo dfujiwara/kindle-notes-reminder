@@ -8,6 +8,7 @@ from .prompts import (
     create_evaluation_prompt,
     create_context_prompt,
     create_chunk_context_prompt,
+    create_tweet_context_prompt,
 )
 
 
@@ -78,3 +79,31 @@ def test_basic_chunk_context_prompt():
     assert url in prompt
     assert url_title in prompt
     assert chunk_content in prompt
+
+
+def test_chunk_context_prompt_includes_related_chunks():
+    """Test chunk context prompt includes similar chunks when provided."""
+    prompt = create_chunk_context_prompt(
+        "https://example.com/python-guide",
+        "Python Tutorials",
+        "Functions are reusable code blocks",
+        ["Loops repeat work", "Classes organize code"],
+    )
+
+    assert "Related chunks:" in prompt
+    assert "Loops repeat work" in prompt
+    assert "Classes organize code" in prompt
+
+
+def test_tweet_context_prompt_includes_related_tweets():
+    """Test tweet context prompt includes similar tweets when provided."""
+    prompt = create_tweet_context_prompt(
+        "testuser",
+        "Learning Python with small projects",
+        ["Start with scripts", "Build one small tool at a time"],
+    )
+
+    assert "Tweet by @testuser" in prompt
+    assert "Related tweets:" in prompt
+    assert "Start with scripts" in prompt
+    assert "Build one small tool at a time" in prompt

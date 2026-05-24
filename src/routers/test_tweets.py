@@ -21,7 +21,7 @@ client = TestClient(app)
 
 def test_ingest_tweet_fetch_error(setup_tweet_deps: TweetDepsSetup):
     """Test tweet fetch error returns 422."""
-    _, _, fetcher = setup_tweet_deps(fetcher_should_fail=True)
+    _, _, fetcher, _ = setup_tweet_deps(fetcher_should_fail=True)
 
     response = client.post("/tweets", json={"tweet_input": "123456789"})
 
@@ -34,7 +34,7 @@ def test_ingest_tweet_fetch_error(setup_tweet_deps: TweetDepsSetup):
 
 def test_ingest_tweet_success(setup_tweet_deps: TweetDepsSetup):
     """Test successful tweet ingestion returns 200 with thread and tweets stored."""
-    thread_repo, tweet_repo, _ = setup_tweet_deps()
+    thread_repo, tweet_repo, _, _ = setup_tweet_deps()
 
     response = client.post("/tweets", json={"tweet_input": "123456789"})
 
@@ -60,7 +60,7 @@ def test_ingest_tweet_success(setup_tweet_deps: TweetDepsSetup):
 
 def test_ingest_tweet_deduplication(setup_tweet_deps: TweetDepsSetup):
     """Test that ingesting the same tweet twice returns existing record."""
-    _, _, fetcher = setup_tweet_deps()
+    _, _, fetcher, _ = setup_tweet_deps()
 
     # Ingest the same tweet twice
     response1 = client.post("/tweets", json={"tweet_input": "123456789"})
@@ -102,7 +102,7 @@ def test_get_tweets_empty(setup_tweet_deps: TweetDepsSetup):
 
 def test_get_tweets_with_threads(setup_tweet_deps: TweetDepsSetup):
     """Test GET /tweets returns all threads."""
-    thread_repo, _, _ = setup_tweet_deps()
+    thread_repo, _, _, _ = setup_tweet_deps()
 
     # Create test threads
     thread1 = thread_repo.add(
@@ -156,7 +156,7 @@ def test_get_tweet_thread_not_found(setup_tweet_deps: TweetDepsSetup):
 
 def test_get_tweet_thread_empty_tweets(setup_tweet_deps: TweetDepsSetup):
     """Test GET /tweets/{thread_id} returns thread with empty tweets list."""
-    thread_repo, _, _ = setup_tweet_deps()
+    thread_repo, _, _, _ = setup_tweet_deps()
 
     thread = thread_repo.add(
         TweetThreadCreate(
@@ -179,7 +179,7 @@ def test_get_tweet_thread_empty_tweets(setup_tweet_deps: TweetDepsSetup):
 
 def test_get_tweet_thread_with_tweets(setup_tweet_deps: TweetDepsSetup):
     """Test GET /tweets/{thread_id} returns thread with all tweets sorted by position."""
-    thread_repo, tweet_repo, _ = setup_tweet_deps()
+    thread_repo, tweet_repo, _, _ = setup_tweet_deps()
 
     thread = thread_repo.add(
         TweetThreadCreate(
@@ -250,7 +250,7 @@ def test_get_tweet_with_context_stream_thread_not_found(
     setup_tweet_deps: TweetDepsSetup,
 ):
     """Test GET /tweets/{thread_id}/tweets/{tweet_id} returns 404 when thread not found."""
-    _, tweet_repo, _ = setup_tweet_deps()
+    _, tweet_repo, _, _ = setup_tweet_deps()
 
     # Add a tweet to a non-existent thread
     now = datetime.now(timezone.utc)
@@ -277,13 +277,13 @@ def test_get_tweet_with_context_stream_thread_not_found(
 @pytest.mark.asyncio
 async def test_get_tweet_with_context_stream_success(setup_tweet_deps: TweetDepsSetup):
     """Test GET /tweets/{thread_id}/tweets/{tweet_id} streams events correctly."""
-    thread_repo, tweet_repo, _ = setup_tweet_deps()
+    thread_repo, tweet_repo, _, llm_client = setup_tweet_deps()
 
-    # Create test thread and tweet
+    # Create test thread and tweets
     thread, tweets = make_thread_and_tweets(
         thread_repo,
         tweet_repo,
-        tweet_contents=["Test tweet content"],
+        tweet_contents=["Test tweet content", "Related tweet content"],
         root_tweet_id="tweet001",
         embedding=[0.1] * 1536,
     )
@@ -332,3 +332,7 @@ async def test_get_tweet_with_context_stream_success(setup_tweet_deps: TweetDeps
             assert len(content_events) >= 1
             full_content = "".join([e["data"]["content"] for e in content_events])
             assert full_content == "Test LLM response"
+
+            # Verify related tweet content was included in the LLM prompt
+            assert llm_client.prompts
+            assert "Related tweet content" in llm_client.prompts[0]

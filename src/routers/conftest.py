@@ -60,6 +60,7 @@ URLDepsSetup = Callable[
         StubURLRepository,
         StubURLChunkRepository,
         StubURLFetcher,
+        StubLLMClient,
     ],
 ]
 NotebookDepsSetup = Callable[
@@ -97,6 +98,7 @@ TweetDepsSetup = Callable[
         StubTweetThreadRepository,
         StubTweetRepository,
         StubTwitterFetcher,
+        StubLLMClient,
     ],
 ]
 
@@ -243,26 +245,32 @@ def setup_url_deps() -> Generator[URLDepsSetup, None, None]:
 
     Usage:
         def test_url(setup_url_deps):
-            url_repo, chunk_repo, fetcher = setup_url_deps()
+            url_repo, chunk_repo, fetcher, llm_client = setup_url_deps()
             # or with error simulation:
-            url_repo, chunk_repo, fetcher = setup_url_deps(fetcher_should_fail=True)
+            url_repo, chunk_repo, fetcher, llm_client = setup_url_deps(fetcher_should_fail=True)
             # Cleanup is automatic!
     """
 
     def _setup(
         fetcher_should_fail: bool = False,
-    ) -> tuple[StubURLRepository, StubURLChunkRepository, StubURLFetcher]:
+    ) -> tuple[
+        StubURLRepository,
+        StubURLChunkRepository,
+        StubURLFetcher,
+        StubLLMClient,
+    ]:
         url_repo = StubURLRepository()
         chunk_repo = StubURLChunkRepository()
         fetcher = StubURLFetcher(should_fail=fetcher_should_fail)
+        llm_client = StubLLMClient()
 
         app.dependency_overrides[get_url_repository] = lambda: url_repo
         app.dependency_overrides[get_urlchunk_repository] = lambda: chunk_repo
         app.dependency_overrides[get_url_fetcher] = lambda: fetcher
-        app.dependency_overrides[get_llm_client] = lambda: StubLLMClient()
+        app.dependency_overrides[get_llm_client] = lambda: llm_client
         app.dependency_overrides[get_embedding_client] = lambda: StubEmbeddingClient()
 
-        return url_repo, chunk_repo, fetcher
+        return url_repo, chunk_repo, fetcher, llm_client
 
     yield _setup
     app.dependency_overrides.clear()
@@ -419,26 +427,32 @@ def setup_tweet_deps() -> Generator[TweetDepsSetup, None, None]:
 
     Usage:
         def test_tweet(setup_tweet_deps):
-            thread_repo, tweet_repo, fetcher = setup_tweet_deps()
+            thread_repo, tweet_repo, fetcher, llm_client = setup_tweet_deps()
             # or with error simulation:
-            thread_repo, tweet_repo, fetcher = setup_tweet_deps(fetcher_should_fail=True)
+            thread_repo, tweet_repo, fetcher, llm_client = setup_tweet_deps(fetcher_should_fail=True)
             # Cleanup is automatic!
     """
 
     def _setup(
         fetcher_should_fail: bool = False,
-    ) -> tuple[StubTweetThreadRepository, StubTweetRepository, StubTwitterFetcher]:
+    ) -> tuple[
+        StubTweetThreadRepository,
+        StubTweetRepository,
+        StubTwitterFetcher,
+        StubLLMClient,
+    ]:
         thread_repo = StubTweetThreadRepository()
         tweet_repo = StubTweetRepository()
         fetcher = StubTwitterFetcher(should_fail=fetcher_should_fail)
+        llm_client = StubLLMClient()
 
         app.dependency_overrides[get_tweet_thread_repository] = lambda: thread_repo
         app.dependency_overrides[get_tweet_repository] = lambda: tweet_repo
         app.dependency_overrides[get_twitter_fetcher] = lambda: fetcher
-        app.dependency_overrides[get_llm_client] = lambda: StubLLMClient()
+        app.dependency_overrides[get_llm_client] = lambda: llm_client
         app.dependency_overrides[get_embedding_client] = lambda: StubEmbeddingClient()
 
-        return thread_repo, tweet_repo, fetcher
+        return thread_repo, tweet_repo, fetcher, llm_client
 
     yield _setup
     app.dependency_overrides.clear()

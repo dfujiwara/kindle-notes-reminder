@@ -100,7 +100,12 @@ def _prepare_chunk_content(
         chunk, limit=RELATED_CHUNKS_LIMIT
     )
     metadata = build_unified_response_for_chunk(url, chunk, similar_chunks)
-    prompt = create_chunk_context_prompt(url.url, url.title, chunk.content)
+    prompt = create_chunk_context_prompt(
+        url.url,
+        url.title,
+        chunk.content,
+        [similar_chunk.content for similar_chunk in similar_chunks],
+    )
 
     return metadata, prompt
 
@@ -120,7 +125,11 @@ def _prepare_tweet_content(
         tweet, limit=RELATED_TWEETS_LIMIT
     )
     metadata = build_unified_response_for_tweet(thread, tweet, similar_tweets)
-    prompt = create_tweet_context_prompt(tweet.author_username, tweet.content)
+    prompt = create_tweet_context_prompt(
+        tweet.author_username,
+        tweet.content,
+        [similar_tweet.content for similar_tweet in similar_tweets],
+    )
 
     return metadata, prompt
 
