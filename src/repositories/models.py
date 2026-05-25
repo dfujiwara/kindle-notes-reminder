@@ -1,7 +1,9 @@
-from sqlmodel import Field, SQLModel, Relationship, UniqueConstraint, Column, JSON
 from datetime import datetime, timezone
-from pgvector.sqlalchemy import Vector
 from typing import Optional, TYPE_CHECKING, cast, Literal
+
+from pydantic import computed_field
+from pgvector.sqlalchemy import Vector
+from sqlmodel import Column, JSON, Field, Relationship, SQLModel, UniqueConstraint
 from src.types import Embedding
 from src.config import settings
 
@@ -296,6 +298,11 @@ class TweetThreadResponse(SQLModel):
     fetched_at: datetime
     created_at: datetime
 
+    @computed_field
+    @property
+    def canonical_url(self) -> str:
+        return f"https://x.com/i/web/status/{self.root_tweet_id}"
+
 
 # Tweet Models
 
@@ -410,6 +417,11 @@ class TweetThreadSource(SQLModel):
     root_tweet_id: str
     tweet_count: int
     created_at: datetime
+
+    @computed_field
+    @property
+    def canonical_url(self) -> str:
+        return f"https://x.com/i/web/status/{self.root_tweet_id}"
 
 
 # Type alias for source union

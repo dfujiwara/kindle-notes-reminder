@@ -265,6 +265,10 @@ def test_search_tweets_single_thread(setup_search_deps: SearchDepsSetup):
 
     # Check thread structure
     assert thread_result["thread"]["root_tweet_id"] == "123456789"
+    assert (
+        thread_result["thread"]["canonical_url"]
+        == "https://x.com/i/web/status/123456789"
+    )
 
     # Check matched tweets
     assert len(thread_result["tweets"]) == 2
