@@ -231,6 +231,7 @@ def test_get_tweet_thread_empty_tweets(setup_tweet_deps: TweetDepsSetup):
     data = response.json()
     assert data["thread"]["id"] == thread.id
     assert data["thread"]["root_tweet_id"] == "tweet001"
+    assert data["thread"]["canonical_url"] == "https://x.com/i/web/status/tweet001"
     assert data["thread"]["title"] == "My thread"
     assert len(data["tweets"]) == 0
 
@@ -379,6 +380,10 @@ async def test_get_tweet_with_context_stream_success(setup_tweet_deps: TweetDeps
             metadata = events[0]["data"]
             assert metadata["source"]["id"] == thread.id
             assert metadata["source"]["root_tweet_id"] == "tweet001"
+            assert (
+                metadata["source"]["canonical_url"]
+                == "https://x.com/i/web/status/tweet001"
+            )
             assert metadata["source"]["type"] == "tweet_thread"
             assert metadata["content"]["id"] == tweet.id
             assert metadata["content"]["content"] == "Test tweet content"

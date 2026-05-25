@@ -197,6 +197,10 @@ async def test_random_v2_tweet_response_structure(
             assert metadata["source"]["id"] == thread.id
             assert metadata["source"]["type"] == "tweet_thread"
             assert metadata["source"]["root_tweet_id"] == "root123"
+            assert (
+                metadata["source"]["canonical_url"]
+                == "https://x.com/i/web/status/root123"
+            )
 
             # Verify content is the tweet
             assert metadata["content"]["id"] == tweet.id
