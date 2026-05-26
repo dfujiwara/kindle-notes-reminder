@@ -60,7 +60,7 @@ def parse_tweet_input(input_str: str) -> str:
     )
 
 
-async def fetch_tweet(
+async def _fetch_tweet(
     tweet_id: str,
     bearer_token: str | None = None,
     timeout: int | None = None,
@@ -168,7 +168,7 @@ async def fetch_thread(
     timeout_val = timeout or settings.twitter_fetch_timeout
 
     # First, fetch the initial tweet to get conversation_id and author
-    initial_tweet = await fetch_tweet(tweet_id, bearer_token, timeout_val)
+    initial_tweet = await _fetch_tweet(tweet_id, bearer_token, timeout_val)
 
     if not initial_tweet.conversation_id:
         # Single tweet, not part of a thread
@@ -312,7 +312,7 @@ async def _fetch_thread_recursive(
             break
 
         try:
-            parent = await fetch_tweet(
+            parent = await _fetch_tweet(
                 current.in_reply_to_tweet_id, bearer_token, timeout
             )
             # Only include if same author (thread continuation)
