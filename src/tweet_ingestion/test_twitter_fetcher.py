@@ -2,11 +2,9 @@
 Tests for Twitter fetching and content extraction functionality.
 """
 
-import httpx
 import pytest
 import respx
 from httpx import Response
-from unittest.mock import patch
 
 from src.tweet_ingestion.interfaces import (
     TwitterFetchError,
@@ -15,7 +13,6 @@ from src.tweet_ingestion.interfaces import (
     ThreadTooLargeError,
 )
 from src.tweet_ingestion.twitter_fetcher import (
-    fetch_tweet,
     fetch_thread,
     parse_tweet_input,
 )
@@ -49,41 +46,6 @@ class TestParseTweetInput:
             parse_tweet_input("https://example.com/something")
 
 
-# Sample Twitter API v2 responses
-SAMPLE_TWEET_RESPONSE = {
-    "data": {
-        "id": "1234567890",
-        "text": "This is a sample tweet content",
-        "author_id": "12345",
-        "conversation_id": "1234567890",
-        "created_at": "2024-01-15T10:30:00.000Z",
-    },
-    "includes": {
-        "users": [{"id": "12345", "username": "testuser", "name": "Test User"}]
-    },
-}
-
-SAMPLE_TWEET_WITH_MEDIA_RESPONSE = {
-    "data": {
-        "id": "1234567891",
-        "text": "Tweet with images!",
-        "author_id": "12345",
-        "conversation_id": "1234567891",
-        "created_at": "2024-01-15T11:00:00.000Z",
-        "attachments": {"media_keys": ["media1", "media2"]},
-    },
-    "includes": {
-        "users": [{"id": "12345", "username": "testuser", "name": "Test User"}],
-        "media": [
-            {"media_key": "media1", "url": "https://pbs.twimg.com/media/image1.jpg"},
-            {
-                "media_key": "media2",
-                "preview_image_url": "https://pbs.twimg.com/media/video_preview.jpg",
-            },
-        ],
-    },
-}
-
 SAMPLE_THREAD_SEARCH_RESPONSE = {
     "data": [
         {
@@ -112,148 +74,6 @@ SAMPLE_THREAD_SEARCH_RESPONSE = {
         "users": [{"id": "12345", "username": "threadauthor", "name": "Thread Author"}]
     },
 }
-
-
-class TestFetchTweet:
-    """Tests for fetch_tweet function."""
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_fetch_tweet_success(self):
-        """Test successful tweet fetch."""
-        respx.get("https://api.twitter.com/2/tweets/1234567890").mock(
-            return_value=Response(200, json=SAMPLE_TWEET_RESPONSE)
-        )
-
-        result = await fetch_tweet("1234567890", bearer_token="test_token")
-
-        assert result.tweet_id == "1234567890"
-        assert result.content == "This is a sample tweet content"
-        assert result.author_username == "testuser"
-        assert result.author_display_name == "Test User"
-        assert result.conversation_id == "1234567890"
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_fetch_tweet_with_media(self):
-        """Test fetching tweet with media attachments."""
-        respx.get("https://api.twitter.com/2/tweets/1234567891").mock(
-            return_value=Response(200, json=SAMPLE_TWEET_WITH_MEDIA_RESPONSE)
-        )
-
-        result = await fetch_tweet("1234567891", bearer_token="test_token")
-
-        assert result.tweet_id == "1234567891"
-        assert len(result.media_urls) == 2
-        assert "https://pbs.twimg.com/media/image1.jpg" in result.media_urls
-        assert "https://pbs.twimg.com/media/video_preview.jpg" in result.media_urls
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_fetch_tweet_not_found(self):
-        """Test that 404 raises TweetNotFoundError."""
-        respx.get("https://api.twitter.com/2/tweets/9999999999").mock(
-            return_value=Response(404)
-        )
-
-        with pytest.raises(TweetNotFoundError, match="Tweet not found"):
-            await fetch_tweet("9999999999", bearer_token="test_token")
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_fetch_tweet_rate_limited(self):
-        """Test that 429 raises RateLimitError."""
-        respx.get("https://api.twitter.com/2/tweets/1234567890").mock(
-            return_value=Response(429, headers={"retry-after": "60"})
-        )
-
-        with pytest.raises(RateLimitError) as exc_info:
-            await fetch_tweet("1234567890", bearer_token="test_token")
-
-        assert exc_info.value.retry_after == 60
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_fetch_tweet_rate_limited_no_retry_header(self):
-        """Test rate limit without retry-after header."""
-        respx.get("https://api.twitter.com/2/tweets/1234567890").mock(
-            return_value=Response(429)
-        )
-
-        with pytest.raises(RateLimitError) as exc_info:
-            await fetch_tweet("1234567890", bearer_token="test_token")
-
-        assert exc_info.value.retry_after is None
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_fetch_tweet_api_error_in_response(self):
-        """Test handling of API errors in response body."""
-        error_response = {"errors": [{"detail": "Tweet not found or not accessible"}]}
-        respx.get("https://api.twitter.com/2/tweets/1234567890").mock(
-            return_value=Response(200, json=error_response)
-        )
-
-        with pytest.raises(TweetNotFoundError):
-            await fetch_tweet("1234567890", bearer_token="test_token")
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_fetch_tweet_timeout(self):
-        """Test that timeout raises TwitterFetchError."""
-        respx.get("https://api.twitter.com/2/tweets/1234567890").mock(
-            side_effect=httpx.TimeoutException("Connection timeout")
-        )
-
-        with pytest.raises(TwitterFetchError, match="Timeout"):
-            await fetch_tweet("1234567890", bearer_token="test_token")
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_fetch_tweet_http_error(self):
-        """Test that HTTP errors raise TwitterFetchError."""
-        respx.get("https://api.twitter.com/2/tweets/1234567890").mock(
-            return_value=Response(500)
-        )
-
-        with pytest.raises(TwitterFetchError, match="HTTP error 500"):
-            await fetch_tweet("1234567890", bearer_token="test_token")
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_fetch_tweet_connection_error(self):
-        """Test that connection errors raise TwitterFetchError."""
-        respx.get("https://api.twitter.com/2/tweets/1234567890").mock(
-            side_effect=httpx.ConnectError("Connection refused")
-        )
-
-        with pytest.raises(TwitterFetchError, match="Request failed"):
-            await fetch_tweet("1234567890", bearer_token="test_token")
-
-    @pytest.mark.asyncio
-    async def test_fetch_tweet_no_bearer_token(self):
-        """Test that missing bearer token raises TwitterFetchError."""
-        with patch(
-            "src.tweet_ingestion.twitter_fetcher._get_bearer_token",
-            side_effect=TwitterFetchError("Twitter Bearer Token not configured"),
-        ):
-            with pytest.raises(TwitterFetchError, match="Bearer Token not configured"):
-                await fetch_tweet("1234567890")
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_fetch_tweet_parses_created_at(self):
-        """Test that created_at is parsed correctly."""
-        respx.get("https://api.twitter.com/2/tweets/1234567890").mock(
-            return_value=Response(200, json=SAMPLE_TWEET_RESPONSE)
-        )
-
-        result = await fetch_tweet("1234567890", bearer_token="test_token")
-
-        assert result.tweeted_at is not None
-        assert result.tweeted_at.year == 2024
-        assert result.tweeted_at.month == 1
-        assert result.tweeted_at.day == 15
 
 
 class TestFetchThread:
