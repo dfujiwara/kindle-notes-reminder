@@ -50,21 +50,24 @@ SAMPLE_THREAD_SEARCH_RESPONSE = {
     "data": [
         {
             "id": "1234567890",
-            "text": "Thread tweet 1/3",
+            "text": "Thread tweet 1/3 preview",
+            "note_tweet": {"text": "Thread note tweet 1/3"},
             "author_id": "12345",
             "conversation_id": "1234567890",
             "created_at": "2024-01-15T10:00:00.000Z",
         },
         {
             "id": "1234567891",
-            "text": "Thread tweet 2/3",
+            "text": "Thread tweet 2/3 preview",
+            "note_tweet": {"text": "Thread note tweet 2/3"},
             "author_id": "12345",
             "conversation_id": "1234567890",
             "created_at": "2024-01-15T10:01:00.000Z",
         },
         {
             "id": "1234567892",
-            "text": "Thread tweet 3/3",
+            "text": "Thread tweet 3/3 preview",
+            "note_tweet": {"text": "Thread note tweet 3/3"},
             "author_id": "12345",
             "conversation_id": "1234567890",
             "created_at": "2024-01-15T10:02:00.000Z",
@@ -86,7 +89,8 @@ class TestFetchThread:
         single_tweet_response = {
             "data": {
                 "id": "1234567890",
-                "text": "Just a single tweet",
+                "text": "Just a preview",
+                "note_tweet": {"text": "Just a single tweet"},
                 "author_id": "12345",
                 "created_at": "2024-01-15T10:00:00.000Z",
             },
@@ -110,13 +114,44 @@ class TestFetchThread:
 
     @pytest.mark.asyncio
     @respx.mock
+    async def test_fetch_single_tweet_thread_falls_back_to_text_when_note_tweet_empty(
+        self,
+    ):
+        """Test that empty note_tweet falls back to text."""
+        response = {
+            "data": {
+                "id": "1234567894",
+                "text": "Fallback preview text",
+                "note_tweet": {"text": ""},
+                "author_id": "12345",
+                "created_at": "2024-01-15T10:04:00.000Z",
+            },
+            "includes": {
+                "users": [
+                    {"id": "12345", "username": "fallbackuser", "name": "Fallback User"}
+                ]
+            },
+        }
+
+        respx.get("https://api.twitter.com/2/tweets/1234567894").mock(
+            return_value=Response(200, json=response)
+        )
+
+        result = await fetch_thread("1234567894", bearer_token="test_token")
+
+        assert result.tweets[0].content == "Fallback preview text"
+        assert result.author_username == "fallbackuser"
+
+    @pytest.mark.asyncio
+    @respx.mock
     async def test_fetch_thread_via_conversation_search(self):
         """Test fetching a multi-tweet thread."""
         # First call: get initial tweet
         initial_tweet_response = {
             "data": {
                 "id": "1234567892",
-                "text": "Thread tweet 3/3",
+                "text": "Thread tweet 3/3 preview",
+                "note_tweet": {"text": "Thread note tweet 3/3"},
                 "author_id": "12345",
                 "conversation_id": "1234567890",
                 "created_at": "2024-01-15T10:02:00.000Z",
@@ -145,9 +180,9 @@ class TestFetchThread:
         assert result.author_username == "threadauthor"
 
         # Tweets should be sorted by created_at
-        assert result.tweets[0].content == "Thread tweet 1/3"
-        assert result.tweets[1].content == "Thread tweet 2/3"
-        assert result.tweets[2].content == "Thread tweet 3/3"
+        assert result.tweets[0].content == "Thread note tweet 1/3"
+        assert result.tweets[1].content == "Thread note tweet 2/3"
+        assert result.tweets[2].content == "Thread note tweet 3/3"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -156,7 +191,8 @@ class TestFetchThread:
         initial_tweet_response = {
             "data": {
                 "id": "1234567890",
-                "text": "Initial tweet",
+                "text": "Initial tweet preview",
+                "note_tweet": {"text": "Initial note tweet"},
                 "author_id": "12345",
                 "conversation_id": "1234567890",
                 "created_at": "2024-01-15T10:00:00.000Z",
@@ -180,6 +216,7 @@ class TestFetchThread:
         # Should fall back to just the initial tweet
         assert len(result.tweets) == 1
         assert result.tweets[0].tweet_id == "1234567890"
+        assert result.tweets[0].content == "Initial note tweet"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -267,7 +304,8 @@ class TestFetchThreadFallback:
         tweet_2 = {
             "data": {
                 "id": "tweet_2",
-                "text": "Reply tweet",
+                "text": "Reply tweet preview",
+                "note_tweet": {"text": "Reply note tweet"},
                 "author_id": "12345",
                 "conversation_id": "tweet_1",
                 "referenced_tweets": [{"type": "replied_to", "id": "tweet_1"}],
@@ -281,7 +319,8 @@ class TestFetchThreadFallback:
         tweet_1 = {
             "data": {
                 "id": "tweet_1",
-                "text": "Original tweet",
+                "text": "Original tweet preview",
+                "note_tweet": {"text": "Original note tweet"},
                 "author_id": "12345",
                 "conversation_id": "tweet_1",
                 "created_at": "2024-01-15T10:00:00.000Z",
@@ -311,6 +350,10 @@ class TestFetchThreadFallback:
         # Should have both tweets via recursive traversal
         assert len(result.tweets) == 2
         assert result.root_tweet_id == "tweet_1"
+        assert [tweet.content for tweet in result.tweets] == [
+            "Original note tweet",
+            "Reply note tweet",
+        ]
 
     @pytest.mark.asyncio
     @respx.mock
@@ -320,7 +363,8 @@ class TestFetchThreadFallback:
         tweet_3 = {
             "data": {
                 "id": "tweet_3",
-                "text": "My follow-up",
+                "text": "My follow-up preview",
+                "note_tweet": {"text": "My follow-up note tweet"},
                 "author_id": "author_a",
                 "conversation_id": "tweet_1",
                 "referenced_tweets": [{"type": "replied_to", "id": "tweet_2"}],
@@ -334,7 +378,8 @@ class TestFetchThreadFallback:
         tweet_2 = {
             "data": {
                 "id": "tweet_2",
-                "text": "Alice continues",
+                "text": "Alice continues preview",
+                "note_tweet": {"text": "Alice continues note tweet"},
                 "author_id": "author_a",
                 "conversation_id": "tweet_1",
                 "referenced_tweets": [{"type": "replied_to", "id": "tweet_1"}],
@@ -348,7 +393,8 @@ class TestFetchThreadFallback:
         tweet_1_different_author = {
             "data": {
                 "id": "tweet_1",
-                "text": "Someone else started this",
+                "text": "Someone else started this preview",
+                "note_tweet": {"text": "Someone else note tweet"},
                 "author_id": "author_b",
                 "conversation_id": "tweet_1",
                 "created_at": "2024-01-15T10:00:00.000Z",
@@ -378,3 +424,7 @@ class TestFetchThreadFallback:
         assert all(t.author_username == "alice" for t in result.tweets)
         assert result.tweets[0].tweet_id == "tweet_2"
         assert result.tweets[1].tweet_id == "tweet_3"
+        assert [tweet.content for tweet in result.tweets] == [
+            "Alice continues note tweet",
+            "My follow-up note tweet",
+        ]

@@ -4,11 +4,12 @@ Twitter fetching and content extraction utilities.
 Fetches tweets and threads using Twitter API v2 with Bearer Token authentication.
 """
 
-import httpx
 import logging
 import re
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
+
+import httpx
 
 from src.config import settings
 from src.tweet_ingestion.interfaces import (
@@ -86,7 +87,7 @@ async def _fetch_tweet(
 
     url = f"{TWITTER_API_BASE}/tweets/{tweet_id}"
     params = {
-        "tweet.fields": "author_id,conversation_id,created_at,referenced_tweets,attachments",
+        "tweet.fields": "author_id,conversation_id,created_at,referenced_tweets,attachments,note_tweet",
         "expansions": "author_id,attachments.media_keys,referenced_tweets.id",
         "user.fields": "username,name",
         "media.fields": "url,preview_image_url",
@@ -238,7 +239,7 @@ async def _fetch_conversation_tweets(
     url = f"{TWITTER_API_BASE}/tweets/search/recent"
     params = {
         "query": f"conversation_id:{conversation_id} from:{author_username}",
-        "tweet.fields": "author_id,conversation_id,created_at,referenced_tweets,attachments",
+        "tweet.fields": "author_id,conversation_id,created_at,referenced_tweets,attachments,note_tweet",
         "expansions": "author_id,attachments.media_keys,referenced_tweets.id",
         "user.fields": "username,name",
         "media.fields": "url,preview_image_url",
@@ -330,6 +331,20 @@ async def _fetch_thread_recursive(
     return tweets
 
 
+def _extract_tweet_content(tweet_data: dict[str, Any]) -> str:
+    """Extract tweet text, preferring note_tweet content when present."""
+    text_field = tweet_data.get("text", "")
+    note_tweet = tweet_data.get("note_tweet")
+
+    if isinstance(note_tweet, dict):
+        note_tweet_dict = cast(dict[str, Any], note_tweet)
+        note_text = note_tweet_dict.get("text", "")
+        if note_text:
+            return note_text
+
+    return text_field
+
+
 def _get_bearer_token() -> str:
     """Get Twitter Bearer Token from settings."""
     token = settings.twitter_bearer_token
@@ -389,7 +404,7 @@ def _parse_single_tweet(
         tweet_id=tweet_data["id"],
         author_username=author.get("username", "unknown"),
         author_display_name=author.get("name", "Unknown"),
-        content=tweet_data.get("text", ""),
+        content=_extract_tweet_content(tweet_data),
         tweeted_at=created_at,
         media_urls=media_urls,
         conversation_id=tweet_data.get("conversation_id"),
