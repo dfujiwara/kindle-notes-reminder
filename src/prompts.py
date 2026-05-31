@@ -115,6 +115,24 @@ def create_summary_prompt(content: str) -> str:
 Summary:"""
 
 
+def create_tweet_title_prompt(content: str) -> str:
+    """
+    Create a prompt for generating a one-sentence tweet title.
+
+    Args:
+        content: The tweet content to summarize
+
+    Returns:
+        A formatted one-sentence title prompt string
+    """
+    return f"""Summarize the following tweet in exactly one sentence.
+Keep it natural, concise, and do not add extra text.
+
+{content}
+
+One-sentence summary:"""
+
+
 def create_chunk_context_prompt(
     url: str,
     url_title: str,
