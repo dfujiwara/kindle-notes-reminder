@@ -9,7 +9,7 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 
-from src.prompts import SYSTEM_INSTRUCTIONS
+from src.prompts import SYSTEM_INSTRUCTIONS, create_tweet_title_prompt
 from src.types import Embedding
 from src.embedding_interface import EmbeddingClientInterface
 from src.llm_interface import LLMClientInterface
@@ -36,26 +36,6 @@ from src.tweet_ingestion.twitter_fetcher import (
 )
 
 logger = logging.getLogger(__name__)
-
-# Summary generation settings
-MAX_THREAD_CONTENT_FOR_SUMMARY = 3000  # Characters to send to LLM for summary
-
-
-def _create_thread_summary_prompt(thread_content: str) -> str:
-    """
-    Create a prompt for generating a thread summary.
-
-    Args:
-        thread_content: Combined text of all tweets in the thread
-
-    Returns:
-        A formatted summary prompt string
-    """
-    return f"""Please provide a concise 2-3 sentence summary of this Twitter thread:
-
-{thread_content}
-
-Summary:"""
 
 
 async def process_tweet_content(
@@ -110,7 +90,7 @@ async def process_tweet_content(
         logger.info(f"Thread already exists: {fetched.root_tweet_id}")
         return existing_result
 
-    # Step 4: Generate thread summary (for multi-tweet threads)
+    # Step 4: Generate thread title
     title = await _generate_thread_title(llm_client, fetched)
     logger.info(f"Generated thread title: {title}")
 
@@ -168,32 +148,24 @@ async def _generate_thread_title(
     Generate a title/summary for the thread.
 
     For single tweets, use the first 50 characters of the content.
-    For multi-tweet threads, generate an LLM summary.
+    For multi-tweet threads, summarize only the first tweet with the LLM.
     """
     if len(fetched.tweets) == 1:
         # Single tweet: use truncated content as title
         content = fetched.tweets[0].content
         return content[:50] + "..." if len(content) > 50 else content
 
-    # Multi-tweet thread: combine content and generate summary
-    combined_content = "\n\n".join(
-        f"Tweet {i + 1}: {tweet.content}" for i, tweet in enumerate(fetched.tweets)
-    )
-
-    # Truncate if too long
-    if len(combined_content) > MAX_THREAD_CONTENT_FOR_SUMMARY:
-        combined_content = combined_content[:MAX_THREAD_CONTENT_FOR_SUMMARY] + "..."
-
-    prompt = _create_thread_summary_prompt(combined_content)
+    first_tweet_content = fetched.tweets[0].content
+    prompt = create_tweet_title_prompt(first_tweet_content)
     system_instruction = SYSTEM_INSTRUCTIONS["summarizer"]
 
     try:
         summary = await llm_client.get_response(prompt, system_instruction)
         summary_display = summary[:100] + "..." if len(summary) > 100 else summary
-        logger.info(f"Generated thread summary: {summary_display}")
+        logger.info(f"Generated thread title: {summary_display}")
         return summary
     except Exception as e:
-        logger.error(f"Error generating thread summary: {str(e)}")
+        logger.error(f"Error generating thread title: {str(e)}")
         # Fallback to first tweet content truncated
         content = fetched.tweets[0].content
         return content[:50] + "..." if len(content) > 50 else content

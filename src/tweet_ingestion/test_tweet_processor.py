@@ -69,8 +69,12 @@ async def test_process_multi_tweet_thread_success(
     # Check thread
     assert result.thread.root_tweet_id == "1111111111"
     assert result.thread.tweet_count == 3
-    # Title should be LLM-generated summary
+    # Title should be LLM-generated summary of the first tweet only
     assert result.thread.title == "This is a thread about the topic."
+    assert len(llm_client.prompts) == 1
+    assert "exactly one sentence" in llm_client.prompts[0]
+    assert "Thread 1/3: Introduction to the topic." in llm_client.prompts[0]
+    assert "Thread 2/3: Deep dive into details." not in llm_client.prompts[0]
 
     # Check tweets
     assert len(result.tweets) == 3
