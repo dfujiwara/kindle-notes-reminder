@@ -13,9 +13,10 @@ Resolve and document these decisions before writing application code:
 - Prefer opaque server-side sessions over JWT cookies unless there is a strong reason otherwise.
 - Define session storage, token hashing, absolute and idle expiration, rotation, revocation, logout, password-reset invalidation, and disabled-account behavior.
 - Use a strong password hashing scheme such as Argon2id with a documented parameter policy.
+- Select and add the concrete libraries this design requires (a password hashing library, a signed-cookie/session library such as `itsdangerous`, a CSRF library). None of these are currently installed, even transitively; add them explicitly via `uv add` in this phase rather than picking them ad hoc during later phases.
 - Define normalized email storage and case-sensitivity rules. Preserve the user-entered email separately if needed for display.
 - Define email verification, password-reset, and one-time-token storage. Store only hashed tokens with expiry and single-use semantics.
-- Define rate limits for signup, login, verification, reset, and SSE/resource abuse. Use both IP and account identifiers where appropriate.
+- Define rate limits for signup, login, verification, reset, and SSE/resource abuse. Use both IP and account identifiers where appropriate. Define where rate-limit counters are stored (for example a database table or Redis) — in-process memory does not work correctly once the app runs more than one worker or replica.
 - Define CSRF tokens, Origin/Referer checks, CORS origins, cookie attributes, and native `EventSource` credential behavior.
 - Define the controlled first-user bootstrap gate, including the approved-user mechanism and concurrent-claim locking.
 - Define workspace status, deletion/retention, membership revocation, owner transfer, last-owner protection, and account disablement.

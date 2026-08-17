@@ -115,6 +115,8 @@ Ownership uniqueness is workspace-scoped:
 
 Normalization rules for URLs, whitespace, hashes, titles, authors, and case must be explicit. Database constraints are authoritative; application lookup-then-insert logic must handle concurrent inserts safely.
 
+Workspace-scoped uniqueness trades away cross-workspace content sharing: today dedup keys (content hash, URL, tweet ID) are global, so identical content ingested by two workspaces will, after scoping, be stored and embedded independently in each. This repeats embedding cost per workspace. The implementation plan should treat this as an accepted cost for the initial design; cross-workspace content/embedding reuse can be revisited later without changing the ownership model.
+
 ## Repository and service boundary
 
 Prefer constructing repositories with the scope:
