@@ -79,7 +79,7 @@ Roles belong to memberships, not users. The implementation must define the permi
 - `workspaces`: integer ID, metadata, timestamps, and explicit status/deletion fields.
 - `workspace_memberships`: user ID, workspace ID, role, status, and timestamps; unique `(user_id, workspace_id)`.
 
-An initial `owner` role is required. The system must preserve the workspace ownership invariant, including behavior for disabled users, membership revocation, owner changes, last-owner protection, and workspace deletion.
+Every workspace starts with an `owner`. Ownership rules must cover disabled users, revoked memberships, owner changes, last-owner protection, and workspace deletion.
 
 ### Owned content
 
@@ -113,7 +113,7 @@ Ownership uniqueness is workspace-scoped:
 - tweet threads: `(workspace_id, root_tweet_id)`
 - tweets: `(workspace_id, tweet_id)`
 
-Normalization rules for URLs, whitespace, hashes, titles, authors, and case must be explicit. Database constraints are authoritative; application lookup-then-insert logic must handle concurrent inserts safely.
+Clearly define how URLs, whitespace, hashes, titles, authors, and letter case are normalized before they are compared or stored. The database is the final authority for uniqueness, and application code must safely handle concurrent requests that try to insert the same record.
 
 Workspace-scoped uniqueness trades away cross-workspace content sharing: today dedup keys (content hash, URL, tweet ID) are global, so identical content ingested by two workspaces will, after scoping, be stored and embedded independently in each. This repeats embedding cost per workspace. The implementation plan should treat this as an accepted cost for the initial design; cross-workspace content/embedding reuse can be revisited later without changing the ownership model.
 
@@ -140,17 +140,17 @@ Every repository query over owned data includes the scope. This includes:
 
 Router checks alone are insufficient because repositories may be called by services, processors, workers, or tests.
 
-Detached objects crossing service boundaries must either retain internal ownership metadata or be revalidated through a scope-bound repository before use.
+When an object is passed between services, it must either carry its workspace information with it or be checked again by a repository tied to the current scope before it is used.
 
 ## Database defense in depth
 
-The database enforces:
+The database must enforce the following:
 
-- foreign keys for ownership and parent relationships
-- explicit delete behavior
-- composite parent/child ownership consistency
-- workspace-scoped uniqueness
-- workspace-leading indexes for list, parent lookup, count, and deletion operations
+- Every record belongs to a valid workspace and, when applicable, a valid parent record.
+- Deletion behavior is explicitly defined.
+- Parent and child records always belong to the same workspace.
+- Values that must be unique are unique within each workspace.
+- Indexes begin with the workspace ID to keep lists, lookups, counts, and deletions efficient.
 
 Vector indexes require separate performance evaluation because an HNSW embedding index alone does not guarantee efficient workspace filtering.
 
@@ -168,17 +168,17 @@ Enable RLS after the application scope contract is stable, and benchmark its eff
 
 ## Background work and streams
 
-Background tasks receive an explicit serializable task scope, including workspace ID, originating actor ID, and resource IDs. Workers open their own session, construct scoped repositories, and re-fetch resources before persisting results.
+Background jobs must receive trusted context identifying the workspace, user, membership, and resources they belong to. Workers create their own database session, use workspace-scoped repositories, and load resources again before saving results.
 
-Queued work must be rejected if the originating account or membership is no longer authorized. Long-lived SSE streams need an explicit policy for membership revocation during the stream: terminate immediately, or revalidate at defined intervals/events.
+Reject queued jobs if the user or membership no longer has access. For long-running SSE streams, define how quickly access changes take effect: close the stream immediately, or check authorization periodically or when events occur.
 
-## Bootstrap ownership
+## Assigning ownership of existing data
 
-Existing data is assigned to a controlled bootstrap workspace. The first user becomes its owner only through an approved, gated process.
+Put existing data in a special bootstrap workspace. Only the first approved user can become its owner through a controlled process.
 
-Public signup must not allow an arbitrary user to claim existing private data. After the bootstrap workspace is claimed, ordinary free signup creates a separate workspace and owner membership for each new user.
+Normal signup must not let an arbitrary user claim this existing private data. After the bootstrap workspace has an owner, each new user gets a separate workspace and becomes its owner.
 
-The bootstrap claim must be atomic and serialized against concurrent signup/claim attempts.
+The ownership claim must happen as one atomic operation so that concurrent signup attempts cannot claim the workspace at the same time.
 
 ## Architectural decisions required before implementation
 
@@ -194,15 +194,15 @@ The bootstrap claim must be atomic and serialized against concurrent signup/clai
 10. Database cascade strategy and vector-search filtering strategy.
 11. Whether and when to enable PostgreSQL RLS, including transaction handling, database roles, system access, and PostgreSQL integration tests.
 
-## Security acceptance invariants
+## Security requirements
 
-The production architecture is valid only when:
+The system is ready for production only when:
 
-- no normal owned-data repository can be constructed without a scope;
-- no request model accepts ownership or workspace scope from the client;
-- every owned row has valid, non-null workspace scope;
-- parent and child rows cannot cross workspace boundaries;
-- all data routes are authenticated and authorized;
-- inaccessible resources are non-enumerating;
-- search, random selection, counts, deduplication, streams, and background work are scoped;
-- production fails closed when authentication configuration is missing.
+- Every normal repository for owned data requires an authorization scope.
+- Clients cannot set ownership or workspace scope in requests.
+- Every owned record has a valid workspace.
+- Parent and child records cannot belong to different workspaces.
+- All data routes require authentication and authorization.
+- Users cannot tell whether resources they cannot access exist.
+- Searches, random selections, counts, deduplication, streams, and background jobs are limited to the active workspace.
+- The production system blocks access when authentication settings are missing.
