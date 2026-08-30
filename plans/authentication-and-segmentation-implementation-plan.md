@@ -298,6 +298,22 @@ Test repository enforcement directly through the public repository interfaces, n
 
 Update all existing repository and router fakes so they require and enforce a scope. Do not leave unscoped test doubles that hide production authorization bugs.
 
+## Incremental rollout
+
+The changes should be deployable in stages. The phases above describe implementation order; they do not by themselves provide a safe production rollout. If a single maintenance-window cutover is not acceptable, use this sequence:
+
+1. Add the identity tables and nullable `workspace_id` columns. Do not enforce `NOT NULL`, new uniqueness constraints, or RLS yet.
+2. Deploy code that writes `workspace_id` for all new and changed rows. During this stage, any legacy single-workspace access must use an explicit, temporary bootstrap scope; do not restore a normal unscoped repository constructor.
+3. Backfill existing rows into the bootstrap workspace and verify parent/child scope consistency.
+4. Deploy the authentication and scope-aware repository code. Enable protected routes gradually with feature flags or an allowlist, while keeping the legacy mode available for rollback.
+5. Enable authentication for the existing account, then verify workspace isolation, background work, search, random selection, and streams.
+6. Enforce `NOT NULL`, scoped uniqueness, composite foreign keys, and other final constraints after the backfill and application checks pass.
+7. Enable ordinary signup only after the final constraints and bootstrap ownership checks pass.
+8. Enable RLS separately, if selected, after transaction context and database roles have been tested.
+9. Remove the temporary bootstrap/legacy mode after all clients and workers use the scoped path.
+
+Each stage needs monitoring and a rollback plan. After final constraints are enforced, use forward migrations rather than rolling back to unscoped access.
+
 ## Deployment and production acceptance
 
 Before enabling ordinary signup:
