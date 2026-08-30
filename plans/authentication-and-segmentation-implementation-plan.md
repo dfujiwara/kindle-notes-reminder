@@ -23,6 +23,7 @@ Resolve and document these decisions before writing application code:
 - Define the initial role permission matrix, even if the only role is `owner`.
 - Define whether future workspace selection uses server-side session state or a trusted token claim.
 - Define database cascade behavior and vector-search filtering/index strategy.
+- Decide whether and when to enable PostgreSQL RLS. If enabled, define transaction handling, database roles, system access, and PostgreSQL integration tests.
 
 ## Current code touchpoints
 
@@ -168,6 +169,16 @@ Use affected-row checks for updates/deletes. Do not use `session.get()` for owne
 
 For concurrent deduplication, use PostgreSQL upserts or a nested transaction/savepoint around the insert. After a uniqueness conflict, roll back the failed statement scope before re-querying.
 
+### Database RLS (if enabled)
+
+Add RLS after the application scope contract is stable:
+
+- Set the verified workspace ID for each transaction with `SET LOCAL app.workspace_id`. Never use a client-provided workspace ID.
+- Add policies for every owned table. Policies must control reads, inserts, updates, and deletes with `USING` and `WITH CHECK`.
+- Use an application database role that is not a superuser or table owner. Use separate access paths for migrations, bootstrap, and system operations.
+- Ensure connection pooling cannot carry a workspace setting into another transaction. Missing or invalid workspace context must deny access.
+- Benchmark RLS with pgvector searches before enabling it in production.
+
 ### Service and processor changes
 
 Pass scoped repositories through:
@@ -272,7 +283,10 @@ Test repository enforcement directly through the public repository interfaces, n
 - bootstrap claiming is serialized and idempotent;
 - workspace deletion follows the selected cascade/retention policy;
 - Alembic upgrade/backfill succeeds against representative PostgreSQL data;
-- filtered vector search is scoped before ordering and limiting.
+- filtered vector search is scoped before ordering and limiting;
+- when RLS is enabled, PostgreSQL policies block cross-workspace reads and writes;
+- when RLS is enabled, missing workspace context fails closed and transaction context does not leak through connection pooling;
+- when RLS is enabled, background tasks and vector searches work with the policies in place.
 
 ### Background and stream tests
 
@@ -284,6 +298,22 @@ Test repository enforcement directly through the public repository interfaces, n
 
 Update all existing repository and router fakes so they require and enforce a scope. Do not leave unscoped test doubles that hide production authorization bugs.
 
+## Incremental rollout
+
+The changes should be deployable in stages. The phases above describe implementation order; they do not by themselves provide a safe production rollout. If a single maintenance-window cutover is not acceptable, use this sequence:
+
+1. Add the identity tables and nullable `workspace_id` columns. Do not enforce `NOT NULL`, new uniqueness constraints, or RLS yet.
+2. Deploy code that writes `workspace_id` for all new and changed rows. During this stage, any legacy single-workspace access must use an explicit, temporary bootstrap scope; do not restore a normal unscoped repository constructor.
+3. Backfill existing rows into the bootstrap workspace and verify parent/child scope consistency.
+4. Deploy the authentication and scope-aware repository code. Enable protected routes gradually with feature flags or an allowlist, while keeping the legacy mode available for rollback.
+5. Enable authentication for the existing account, then verify workspace isolation, background work, search, random selection, and streams.
+6. Enforce `NOT NULL`, scoped uniqueness, composite foreign keys, and other final constraints after the backfill and application checks pass.
+7. Enable ordinary signup only after the final constraints and bootstrap ownership checks pass.
+8. Enable RLS separately, if selected, after transaction context and database roles have been tested.
+9. Remove the temporary bootstrap/legacy mode after all clients and workers use the scoped path.
+
+Each stage needs monitoring and a rollback plan. After final constraints are enforced, use forward migrations rather than rolling back to unscoped access.
+
 ## Deployment and production acceptance
 
 Before enabling ordinary signup:
@@ -294,7 +324,8 @@ Before enabling ordinary signup:
 4. verify the approved bootstrap user can claim the workspace;
 5. verify unrelated users receive separate workspaces;
 6. enable free signup;
-7. monitor authentication failures, authorization denials, migration errors, and background-task rejection.
+7. if RLS is enabled, verify the application role cannot bypass policies and that workspace context is set for every transaction;
+8. monitor authentication failures, authorization denials, migration errors, and background-task rejection.
 
 The implementation is production-ready when:
 

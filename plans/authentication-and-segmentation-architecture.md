@@ -154,7 +154,17 @@ The database enforces:
 
 Vector indexes require separate performance evaluation because an HNSW embedding index alone does not guarantee efficient workspace filtering.
 
-PostgreSQL row-level security may be added later as defense in depth, but it does not replace application-level authorization.
+PostgreSQL row-level security (RLS) is a possible second layer of protection. It can block accidental cross-workspace access from an unscoped query or another database client. It does not replace application-level authentication or authorization.
+
+If RLS is enabled:
+
+- After authorization, the application sets the workspace ID for the transaction with `SET LOCAL app.workspace_id`. It never takes this value from client input.
+- Policies cover every owned table and control reads, inserts, updates, and deletes with `USING` and `WITH CHECK`.
+- The application database role is not a superuser or table owner. Migrations, bootstrap, and system operations use separate access paths.
+- Connection pooling must not leak a workspace setting between transactions. Missing or invalid workspace context must deny access.
+- PostgreSQL integration tests cover cross-workspace access, background tasks, and vector searches. SQLite tests cannot test RLS.
+
+Enable RLS after the application scope contract is stable, and benchmark its effect on pgvector searches.
 
 ## Background work and streams
 
@@ -182,6 +192,7 @@ The bootstrap claim must be atomic and serialized against concurrent signup/clai
 8. Role/permission matrix and last-owner behavior.
 9. Future workspace-switching mechanism.
 10. Database cascade strategy and vector-search filtering strategy.
+11. Whether and when to enable PostgreSQL RLS, including transaction handling, database roles, system access, and PostgreSQL integration tests.
 
 ## Security acceptance invariants
 
