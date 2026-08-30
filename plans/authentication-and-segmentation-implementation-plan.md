@@ -23,6 +23,7 @@ Resolve and document these decisions before writing application code:
 - Define the initial role permission matrix, even if the only role is `owner`.
 - Define whether future workspace selection uses server-side session state or a trusted token claim.
 - Define database cascade behavior and vector-search filtering/index strategy.
+- Decide whether and when to enable PostgreSQL RLS. If enabled, define transaction handling, database roles, system access, and PostgreSQL integration tests.
 
 ## Current code touchpoints
 
@@ -168,6 +169,16 @@ Use affected-row checks for updates/deletes. Do not use `session.get()` for owne
 
 For concurrent deduplication, use PostgreSQL upserts or a nested transaction/savepoint around the insert. After a uniqueness conflict, roll back the failed statement scope before re-querying.
 
+### Database RLS (if enabled)
+
+Add RLS after the application scope contract is stable:
+
+- Set the verified workspace ID for each transaction with `SET LOCAL app.workspace_id`. Never use a client-provided workspace ID.
+- Add policies for every owned table. Policies must control reads, inserts, updates, and deletes with `USING` and `WITH CHECK`.
+- Use an application database role that is not a superuser or table owner. Use separate access paths for migrations, bootstrap, and system operations.
+- Ensure connection pooling cannot carry a workspace setting into another transaction. Missing or invalid workspace context must deny access.
+- Benchmark RLS with pgvector searches before enabling it in production.
+
 ### Service and processor changes
 
 Pass scoped repositories through:
@@ -272,7 +283,10 @@ Test repository enforcement directly through the public repository interfaces, n
 - bootstrap claiming is serialized and idempotent;
 - workspace deletion follows the selected cascade/retention policy;
 - Alembic upgrade/backfill succeeds against representative PostgreSQL data;
-- filtered vector search is scoped before ordering and limiting.
+- filtered vector search is scoped before ordering and limiting;
+- when RLS is enabled, PostgreSQL policies block cross-workspace reads and writes;
+- when RLS is enabled, missing workspace context fails closed and transaction context does not leak through connection pooling;
+- when RLS is enabled, background tasks and vector searches work with the policies in place.
 
 ### Background and stream tests
 
@@ -294,7 +308,8 @@ Before enabling ordinary signup:
 4. verify the approved bootstrap user can claim the workspace;
 5. verify unrelated users receive separate workspaces;
 6. enable free signup;
-7. monitor authentication failures, authorization denials, migration errors, and background-task rejection.
+7. if RLS is enabled, verify the application role cannot bypass policies and that workspace context is set for every transaction;
+8. monitor authentication failures, authorization denials, migration errors, and background-task rejection.
 
 The implementation is production-ready when:
 
