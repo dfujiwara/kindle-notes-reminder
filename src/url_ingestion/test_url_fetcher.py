@@ -2,12 +2,27 @@
 Tests for URL fetching and content extraction functionality.
 """
 
+from unittest.mock import patch
+
 import httpx
 import pytest
 import respx
 from httpx import Response
 
-from src.url_ingestion.url_fetcher import fetch_url_content, URLFetchError
+from src.url_ingestion.url_fetcher import (
+    fetch_url_content,
+    validate_url_target,
+    URLFetchError,
+)
+
+# Patch out SSRF validation for HTTP-level tests (DNS unavailable in test env)
+pytestmark = pytest.mark.usefixtures("bypass_ssrf_check")
+
+
+@pytest.fixture(autouse=True)
+def bypass_ssrf_check():
+    with patch("src.url_ingestion.url_fetcher.validate_url_target"):
+        yield
 
 
 @pytest.mark.asyncio
@@ -341,3 +356,68 @@ async def test_fetch_url_complex_html():
     assert "Copyright" not in result.content
     assert "console.log" not in result.content
     assert "font-family" not in result.content
+
+
+# --- SSRF validation tests (these don't use bypass_ssrf_check) ---
+
+
+class TestValidateUrlTarget:
+    """Tests for SSRF protection via validate_url_target."""
+
+    def _mock_resolve(self, ip: str):
+        """Return a mock getaddrinfo result for a single IP."""
+        import socket
+
+        family = socket.AF_INET6 if ":" in ip else socket.AF_INET
+        return [(family, socket.SOCK_STREAM, 0, "", (ip, 0))]
+
+    def test_blocks_localhost(self):
+        with patch("socket.getaddrinfo", return_value=self._mock_resolve("127.0.0.1")):
+            with pytest.raises(URLFetchError, match="blocked network"):
+                validate_url_target("https://localhost/secret")
+
+    def test_blocks_private_10(self):
+        with patch("socket.getaddrinfo", return_value=self._mock_resolve("10.0.0.1")):
+            with pytest.raises(URLFetchError, match="blocked network"):
+                validate_url_target("https://internal.corp/data")
+
+    def test_blocks_private_172(self):
+        with patch("socket.getaddrinfo", return_value=self._mock_resolve("172.16.0.1")):
+            with pytest.raises(URLFetchError, match="blocked network"):
+                validate_url_target("https://internal.corp/data")
+
+    def test_blocks_private_192(self):
+        with patch(
+            "socket.getaddrinfo", return_value=self._mock_resolve("192.168.1.1")
+        ):
+            with pytest.raises(URLFetchError, match="blocked network"):
+                validate_url_target("https://home.local/admin")
+
+    def test_blocks_metadata_endpoint(self):
+        with patch(
+            "socket.getaddrinfo", return_value=self._mock_resolve("169.254.169.254")
+        ):
+            with pytest.raises(URLFetchError, match="blocked network"):
+                validate_url_target("http://169.254.169.254/latest/meta-data/")
+
+    def test_blocks_ipv6_loopback(self):
+        with patch("socket.getaddrinfo", return_value=self._mock_resolve("::1")):
+            with pytest.raises(URLFetchError, match="blocked network"):
+                validate_url_target("https://localhost/secret")
+
+    def test_allows_public_ip(self):
+        with patch(
+            "socket.getaddrinfo", return_value=self._mock_resolve("93.184.216.34")
+        ):
+            validate_url_target("https://example.com/article")
+
+    def test_rejects_no_hostname(self):
+        with pytest.raises(URLFetchError, match="no hostname"):
+            validate_url_target("not-a-url")
+
+    def test_rejects_unresolvable_hostname(self):
+        import socket as _socket
+
+        with patch("socket.getaddrinfo", side_effect=_socket.gaierror):
+            with pytest.raises(URLFetchError, match="Cannot resolve"):
+                validate_url_target("https://nonexistent.invalid/page")

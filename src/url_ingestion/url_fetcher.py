@@ -5,10 +5,13 @@ Fetches URLs and extracts clean, readable text from HTML content using httpx and
 """
 
 import httpx
+import ipaddress
 import logging
+import socket
 from bs4 import BeautifulSoup
 from dataclasses import dataclass
 from typing import Protocol
+from urllib.parse import urlparse
 import re
 
 from src.config import settings
@@ -53,6 +56,48 @@ class URLFetcherInterface(Protocol):
         ...
 
 
+BLOCKED_NETWORKS = [
+    ipaddress.ip_network("0.0.0.0/8"),
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("100.64.0.0/10"),
+    ipaddress.ip_network("127.0.0.0/8"),
+    ipaddress.ip_network("169.254.0.0/16"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.0.0.0/24"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("198.18.0.0/15"),
+    ipaddress.ip_network("::1/128"),
+    ipaddress.ip_network("fc00::/7"),
+    ipaddress.ip_network("fe80::/10"),
+]
+
+
+def validate_url_target(url: str) -> None:
+    """Validate that a URL does not target internal or private network addresses.
+
+    Resolves the hostname to IP addresses and checks against blocked private/reserved
+    network ranges to prevent SSRF attacks.
+
+    Raises:
+        URLFetchError: If the URL targets a blocked network or cannot be resolved.
+    """
+    parsed = urlparse(url)
+    hostname = parsed.hostname
+    if not hostname:
+        raise URLFetchError(f"Invalid URL (no hostname): {url}")
+
+    try:
+        addrinfo = socket.getaddrinfo(hostname, None)
+    except socket.gaierror:
+        raise URLFetchError(f"Cannot resolve hostname: {hostname}")
+
+    for _family, _type, _proto, _canonname, sockaddr in addrinfo:
+        ip = ipaddress.ip_address(sockaddr[0])
+        for network in BLOCKED_NETWORKS:
+            if ip in network:
+                raise URLFetchError(f"URL targets a blocked network ({network}): {url}")
+
+
 supported_content_type = {"text/html", "application/xhtml", "text/plain"}
 # Unwanted tags (including head which contains title and meta)
 html_tags_to_remove = ["script", "style", "nav", "footer", "header", "head"]
@@ -76,6 +121,8 @@ async def fetch_url_content(
     """
     max_content_size = max_content_size or settings.max_url_content_size
     timeout = httpx.Timeout(settings.url_fetch_timeout)
+
+    validate_url_target(url)
 
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:

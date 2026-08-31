@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     embedding_dimension: int = 1536
     default_evaluation_model: str = "gpt-4"
 
+    # Upload limits
+    max_upload_size: int = 10_000_000  # 10MB file upload limit
+
     # URL ingestion configuration
     max_url_content_size: int = 500_000  # 500KB HTML limit
     url_fetch_timeout: int = 30  # seconds
